@@ -86,15 +86,14 @@ void calculate_square(long number)
 
 void queuePush(int d)
 {
-    struct Node *newnode = (struct Node*)malloc(sizeof(struct Node));
+    struct Node *newnode = (struct Node*)malloc(sizeof(struct Node));	//create a new node
     newnode->next = NULL;
     newnode->data = d;
-
-    if(root==NULL)
+    if(root==NULL)	//case if queue is empty
     {
         root = newnode;
     }
-    else
+    else	//if queue is not empty, traverse to last node and insert at end
     {
         struct Node *i = root;
         for(;i->next!=NULL;i=i->next);
@@ -131,30 +130,32 @@ int queuePop()
 
 void thread(int t_id)
 {
-    while(running)  //when a thread is active, it is either currently processing data, or waiting in pthread_cond_wait
+    //when a thread is active, it is either currently processing data, or asleep in pthread_cond_wait
+
+    while(running)	//loop until running is set to false by main thread
     {
-        pthread_mutex_lock(&queue_lock);
+        pthread_mutex_lock(&queue_lock);	//aquire queue mutex since we are manipulating the queue
         if(root!=NULL)  //if the queue is NOT empty, immediately process request
         {
            // printf("\nthread %d queue_notempty\n",t_id);
-            available_array[t_id]=0;
+            available_array[t_id]=0;	//set current thread to unaviailable since it is processing data
             int num = queuePop();
-            pthread_mutex_unlock(&queue_lock);
+            pthread_mutex_unlock(&queue_lock);	//queue manipulation done, unlock queue
             calculate_square(num);
            // printf("Thread: %d finished Job: %d\n\n",t_id,num);
         }
         else    //if queue IS empty, wait until it isnt, unlocking queue_lock in the meantime
         {
             //printf("\nthread %d queue_empty, waiting...\n",t_id);
-            available_array[t_id] = 1;
+            available_array[t_id] = 1;	//thread is now available since there is no data to process
             while(root==NULL)
-                pthread_cond_wait(&queue_condition,&queue_lock);
-            if(running==0)  //check if still running
+                pthread_cond_wait(&queue_condition,&queue_lock);	//put thread to sleep until main() signals it
+            if(running==0)  //after signal, check if still running, if not, don't process anything
                 continue;
-            available_array[t_id]=0;
+            available_array[t_id]=0;	//thread is now processing data, so it is unavailable
             //printf("thread %d queue_empty, finished waiting\n",t_id);
             int num = queuePop();
-            pthread_mutex_unlock(&queue_lock);
+            pthread_mutex_unlock(&queue_lock);	//queue manipulation done, unlock
             calculate_square(num);
             //printf("Thread: %d finished Job: %d\n\n",t_id,num);
         }
@@ -179,9 +180,6 @@ int main(int argc, char* argv[])
     }
 
 
-
-
-
     // check and parse command line options
     if (argc != 3) {
     printf("Usage: sumsq <infile> <thread number>\n");
@@ -192,7 +190,7 @@ int main(int argc, char* argv[])
     pthread_t threads[thread_num];
     int active_thread_num=-1;   //start at -1, first thread is zero
 
-    available_array = malloc(sizeof(bool)*thread_num);
+    available_array = malloc(sizeof(bool)*thread_num);	//allocate available_array with thread_num of elements
     for(int i=0;i<thread_num;i++)
         available_array[i] = 0;
 
@@ -216,7 +214,7 @@ int main(int argc, char* argv[])
                 //printf("available\n");
                 available_array[i]=0;
                 pthread_mutex_unlock(&queue_lock);	//this line might need to be swapped with signal
-                pthread_cond_signal(&queue_condition);
+                pthread_cond_signal(&queue_condition);	//wake up a sleeping thread
                 availableflag=1;
                 break;
             }
@@ -244,7 +242,7 @@ int main(int argc, char* argv[])
     //printf("active threads: %d\n",active_thread_num);
 
     bool f=0;
-    while(f==0)    //wait until queue is empty	Note: rewrite this part
+    while(f==0)    //wait until queue is empty and all threads are finished	Note: rewrite this part
     {
         pthread_mutex_lock(&queue_lock);
         //printf("loop\n");
@@ -275,20 +273,17 @@ int main(int argc, char* argv[])
     running=0;  //end loops in threads
 
 
-    for(int i=0;i<=active_thread_num;i++)    //cancel threads since we dont need them anymore
+    for(int i=0;i<=active_thread_num;i++)    //cancel threads since queue is empty and all jobs are finished
     {
         pthread_cancel(threads[i]);
         //printf("cancel\n");
     }
 
-        //printf("s");
-    free(available_array);
-
-    fclose(fin);
-
     // print results
     printf("%ld %ld %ld %ld\n", sum, odd, min, max);
 
     // clean up and return
+    free(available_array);
+    fclose(fin);
     return (EXIT_SUCCESS);
 }
