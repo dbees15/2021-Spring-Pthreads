@@ -255,7 +255,7 @@ int main(int argc, char* argv[])
         pthread_mutex_unlock(&queue_lock);
     }
 
-    while(active_thread_num!=-1);
+    //while(active_thread_num!=-1);
 
     // print results
     printf("%ld %ld %ld %ld\n", sum, odd, min, max);
