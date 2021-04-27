@@ -28,10 +28,10 @@ long max = INT_MIN;
 bool done = false;
 
 //thread availability array
-volatile bool *available_array;
+bool *available_array;
 
 //queue variables
-volatile struct Node *root = NULL;
+struct Node *root = NULL;
 volatile int queuesize;
 
 //mutex locks
@@ -47,7 +47,7 @@ void calculate_square(long number);
 void queuePush(int d);
 int queuePeek();
 int queuePop();
-void thread(int t_id);
+void *thread(void *thread_id);
 
 /*
  * update global aggregate variables given a number
@@ -128,9 +128,10 @@ int queuePop()
    }
 }
 
-void thread(int t_id)
+void *thread(void *thread_id)
 {
     //when a thread is active, it is either currently processing data, or asleep in pthread_cond_wait
+    long t_id = (long)thread_id;
 
     while(running)	//loop until running is set to false by main thread
     {
@@ -160,7 +161,8 @@ void thread(int t_id)
             //printf("Thread: %d finished Job: %d\n\n",t_id,num);
         }
     }
-
+    pthread_exit(NULL);
+    return NULL;
 }
 
 
@@ -188,7 +190,7 @@ int main(int argc, char* argv[])
     char *fn = argv[1];
     int thread_num = atoi(argv[2]);
     pthread_t threads[thread_num];
-    int active_thread_num=-1;   //start at -1, first thread is zero
+    long active_thread_num=-1;   //start at -1, first thread is zero
 
     available_array = malloc(sizeof(bool)*thread_num);	//allocate available_array with thread_num of elements
     for(int i=0;i<thread_num;i++)
@@ -225,7 +227,7 @@ int main(int argc, char* argv[])
             //printf("create new thread\n");
             pthread_mutex_unlock(&queue_lock);  //the position of this may be wrong
             active_thread_num++;
-            pthread_create(&threads[active_thread_num], NULL, &thread, active_thread_num);
+            pthread_create(&threads[active_thread_num], NULL, &thread, (void *)active_thread_num);
         }
         pthread_mutex_unlock(&queue_lock);
 
@@ -265,14 +267,16 @@ int main(int argc, char* argv[])
         {
             f=0;
         }
-
-        pthread_cond_signal(&queue_condition);
         pthread_mutex_unlock(&queue_lock);
     }
     //printf("END WAIT\nqueue size %d\n",queuesize);
     running=0;  //end loops in threads
 
-
+    for(int i=0;i<=active_thread_num;i++)    //cancel threads since queue is empty and all jobs are finished
+    {
+        pthread_cond_signal(&queue_condition);
+        //printf("cancel\n");
+    }
     for(int i=0;i<=active_thread_num;i++)    //cancel threads since queue is empty and all jobs are finished
     {
         pthread_cancel(threads[i]);
