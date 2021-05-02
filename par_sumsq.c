@@ -33,7 +33,7 @@ long active_thread_num=-1;   //start at -1, first thread is zero
 
 //queue variables
 struct Node *root = NULL;
-volatile int queuesize;
+volatile int queuesize=0;
 
 //mutex locks
 pthread_mutex_t queue_lock;
@@ -213,15 +213,18 @@ int main(int argc, char* argv[])
             pthread_mutex_unlock(&queue_lock);	//this line might need to be swapped with signal
             availableflag=1;
         }
-
-        if(active_thread_num<total_thread_num-1 && !availableflag)	//if no threads currently available, check if we can create a new thread for this job
+        else  if(active_thread_num<total_thread_num-1 && !availableflag)	//if no threads currently available, check if we can create a new thread for this job
         {
             //printf("create new thread\n");
             pthread_mutex_unlock(&queue_lock);  //the position of this may be wrong
             active_thread_num++;
             pthread_create(&threads[active_thread_num], NULL, &thread, NULL);
         }
-        pthread_mutex_unlock(&queue_lock);
+        else
+        {
+            pthread_mutex_unlock(&queue_lock);
+        }
+        
 
     } else if (action == 'w') {     // wait, nothing new happening
         //printf("WAIT\n");
@@ -234,17 +237,22 @@ int main(int argc, char* argv[])
     }
     //printf("File Finished\n");
     //printf("active threads: %d\n",active_thread_num);
-
+    
     bool f=0;
+    //int i=0;
     while(f==0)    //wait until queue is empty and all threads are finished	Note: rewrite this part
     {
         pthread_mutex_lock(&queue_lock);
+        //if(i!=available_threads)
+        //{
         //printf("%d  %d\n",available_threads, queuesize);
+        //i = available_threads;
+        //}
+        
         if(available_threads==active_thread_num+1 && queuesize==0)
             f=1;
         pthread_mutex_unlock(&queue_lock);
     }
-    //printf("END WAIT\nqueue size %d\n",queuesize);
 
     running=0;  //end loops in threads, sleeping threads will exit when signaled
 
