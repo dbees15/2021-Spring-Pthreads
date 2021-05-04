@@ -1,5 +1,5 @@
 /*
- * sumsq.c
+ * par_sumsq.c
  *
  * CS 446.646 Project 1 (Pthreads)
  *
@@ -13,7 +13,7 @@
 #include <unistd.h>
 #include <pthread.h>
 
-
+//Node struct for queue
 struct Node
 {
     int data;
@@ -50,9 +50,102 @@ int queuePeek();
 int queuePop();
 void *thread();
 
-/*
- * update global aggregate variables given a number
- */
+//main function
+int main(int argc, char* argv[])
+{
+    //initialize mutexes and abort if failed
+    if (pthread_mutex_init(&queue_lock, NULL) != 0)
+    {
+        printf("\n queue mutex init failed\n");
+        return 1;
+    }
+
+    if (pthread_mutex_init(&aggregate_lock, NULL) != 0)
+    {
+        printf("\n aggregate mutex init failed\n");
+        return 1;
+    }
+
+    // check and parse command line options
+    if (argc != 3) {
+    printf("Usage: sumsq <infile> <thread number>\n");
+    exit(EXIT_FAILURE);
+    }
+    
+    // get file name and thread number from command line
+    char *fn = argv[1];
+    int total_thread_num = atoi(argv[2]);
+    pthread_t threads[total_thread_num];
+
+    // load numbers and add them to the queue
+    FILE* fin = fopen(fn, "r");
+    char action;
+    long num;
+
+
+    while (fscanf(fin, "%c %ld\n", &action, &num) == 2) {
+    if (action == 'p') {            // process, do some work
+        pthread_mutex_lock(&queue_lock);
+        queuePush(num);     //push job onto queue
+        bool availableflag=0;
+
+        if(available_threads>0)	//check if any thread is currently available (sleeping), wake it up if there is
+        {
+            available_threads--;
+            pthread_cond_signal(&queue_condition);	//wake up a sleeping thread
+            pthread_mutex_unlock(&queue_lock);	//this line might need to be swapped with signal
+            availableflag=1;
+        }
+        else  if(active_thread_num<total_thread_num-1 && !availableflag)	//if no threads currently available, check if we can create a new thread for this job
+        {
+            pthread_mutex_unlock(&queue_lock);  //the position of this may be wrong
+            active_thread_num++;
+            pthread_create(&threads[active_thread_num], NULL, &thread, NULL);
+        }
+        else	//can't process job immediately, so just unlock queue mutex
+        {
+            pthread_mutex_unlock(&queue_lock);
+        }
+        
+
+    } else if (action == 'w') {     // wait, nothing new happening
+        sleep(num);
+    } else {
+        printf("ERROR: Unrecognized action: '%c'\n", action);
+        exit(EXIT_FAILURE);
+    }
+    }
+    
+    bool f=0;
+    while(f==0)    //wait until queue is empty and all threads are finished
+    {
+        pthread_mutex_lock(&queue_lock);
+        if(available_threads==active_thread_num+1 && queuesize==0)	//check if available threads is equal to total active threads and queue is empty
+        {
+            f=1;
+        }
+        pthread_mutex_unlock(&queue_lock);
+    }
+
+    running=0;  //end loops in threads, sleeping threads will exit when signaled
+
+    for(int i=0;i<=active_thread_num;i++)    //wake up all threads, causing them to exit since running is 0
+    {
+        pthread_mutex_lock(&queue_lock);
+        pthread_cond_signal(&queue_condition);
+        pthread_mutex_unlock(&queue_lock);
+    }
+
+    // print results
+    printf("%ld %ld %ld %ld\n", sum, odd, min, max);
+
+    // clean up and return
+    fclose(fin);
+    return (0);
+}
+
+
+//update global aggregate variables given a number
 void calculate_square(long number)
 {
 
@@ -63,7 +156,7 @@ void calculate_square(long number)
     // simulate how hard it is to square this number!
 
     sleep(number);
-    pthread_mutex_lock(&aggregate_lock);	//obtain aggregate lock since we're changing them
+    pthread_mutex_lock(&aggregate_lock);	//obtain aggregate lock since we're changing variables
     // let's add this to our (global) sum
     sum += the_square;
 
@@ -82,9 +175,10 @@ void calculate_square(long number)
     if (number > max) {
     max = number;
     }
-    pthread_mutex_unlock(&aggregate_lock);
+    pthread_mutex_unlock(&aggregate_lock);	//release aggregate lock since all changes are finished
 }
 
+//push value d onto queue
 void queuePush(int d)
 {
     struct Node *newnode = (struct Node*)malloc(sizeof(struct Node));	//create a new node
@@ -103,11 +197,13 @@ void queuePush(int d)
     queuesize++;
 }
 
+//returns data at front of queue
 int queuePeek()
 {
     return root->data;
 }
 
+//remove first element of queue and return it
 int queuePop()
 {
    if(root->next==NULL)
@@ -129,6 +225,7 @@ int queuePop()
    }
 }
 
+//function passed to threads
 void *thread()
 {
     //when a thread is active, it is either currently processing data, or asleep in pthread_cond_wait
@@ -136,8 +233,6 @@ void *thread()
     while(running)	//loop until running is set to false by main thread
     {
         pthread_mutex_lock(&queue_lock);	//aquire queue mutex since we are manipulating the queue
-
-        //printf("queuesize %d\tavailablenum %d\n",queuesize,available_threads) //debug print;
 
         if(root!=NULL)  //if the queue is NOT empty, immediately process request
         {
@@ -160,115 +255,7 @@ void *thread()
         }
     }
     active_thread_num--;    //thread is no longer active
-    //printf("exit thread\n");
     pthread_mutex_unlock(&queue_lock);  //unlock mutex before exiting
     pthread_exit(NULL);
     return NULL;
-}
-
-
-int main(int argc, char* argv[])
-{
-    //initialize mutexes and abort if failed
-    if (pthread_mutex_init(&queue_lock, NULL) != 0)
-    {
-        printf("\n mutex init has failed\n");
-        return 1;
-    }
-
-    if (pthread_mutex_init(&aggregate_lock, NULL) != 0)
-    {
-        printf("\n mutex init has failed\n");
-        return 1;
-    }
-
-
-    // check and parse command line options
-    if (argc != 3) {
-    printf("Usage: sumsq <infile> <thread number>\n");
-    exit(EXIT_FAILURE);
-    }
-    char *fn = argv[1];
-    int total_thread_num = atoi(argv[2]);
-    pthread_t threads[total_thread_num];
-
-    // load numbers and add them to the queue
-    FILE* fin = fopen(fn, "r");
-    char action;
-    long num;
-
-
-    while (fscanf(fin, "%c %ld\n", &action, &num) == 2) {
-    if (action == 'p') {            // process, do some work
-        pthread_mutex_lock(&queue_lock);
-        //printf("ADD_TO_QUEUE: %d\n",num);
-        queuePush(num);     //push job onto queue
-        bool availableflag=0;
-
-        if(available_threads>0)	//check if any thread is currently available (sleeping), wake it up if there is
-        {
-            //printf("available\n");
-            available_threads--;
-            pthread_cond_signal(&queue_condition);	//wake up a sleeping thread
-            pthread_mutex_unlock(&queue_lock);	//this line might need to be swapped with signal
-            availableflag=1;
-        }
-        else  if(active_thread_num<total_thread_num-1 && !availableflag)	//if no threads currently available, check if we can create a new thread for this job
-        {
-            //printf("create new thread\n");
-            pthread_mutex_unlock(&queue_lock);  //the position of this may be wrong
-            active_thread_num++;
-            pthread_create(&threads[active_thread_num], NULL, &thread, NULL);
-        }
-        else
-        {
-            pthread_mutex_unlock(&queue_lock);
-        }
-        
-
-    } else if (action == 'w') {     // wait, nothing new happening
-        //printf("WAIT\n");
-        sleep(num);
-        //printf("ENDWAIT\n");
-    } else {
-        printf("ERROR: Unrecognized action: '%c'\n", action);
-        exit(EXIT_FAILURE);
-    }
-    }
-    //printf("File Finished\n");
-    //printf("active threads: %d\n",active_thread_num);
-    
-    bool f=0;
-    //int i=0;
-    while(f==0)    //wait until queue is empty and all threads are finished	Note: rewrite this part
-    {
-        pthread_mutex_lock(&queue_lock);
-        //if(i!=available_threads)
-        //{
-        //printf("%d  %d\n",available_threads, queuesize);
-        //i = available_threads;
-        //}
-        
-        if(available_threads==active_thread_num+1 && queuesize==0)
-            f=1;
-        pthread_mutex_unlock(&queue_lock);
-    }
-
-    running=0;  //end loops in threads, sleeping threads will exit when signaled
-
-    for(int i=0;i<=active_thread_num;i++)    //wake up all threads, causing them to exit since running is 0
-    {
-        pthread_mutex_lock(&queue_lock);
-        pthread_cond_signal(&queue_condition);
-        pthread_mutex_unlock(&queue_lock);
-    }
-
-    //while(active_thread_num!=-1);
-
-    // print results
-    printf("%ld %ld %ld %ld\n", sum, odd, min, max);
-
-    // clean up and return
-    fclose(fin);
-    return (0);
 }
