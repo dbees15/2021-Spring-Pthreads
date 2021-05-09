@@ -129,11 +129,15 @@ int main(int argc, char* argv[])
 
     running=0;  //end loops in threads, sleeping threads will exit when signaled
 
-    for(int i=0;i<=active_thread_num;i++)    //wake up all threads, causing them to exit since running is 0
+
+    pthread_mutex_lock(&queue_lock);
+    pthread_cond_broadcast(&queue_condition);	//wake up all sleeping threads with broadcast, they exit since running is 0
+    pthread_mutex_unlock(&queue_lock);
+
+    
+    for(int i=0;i<=active_thread_num;i++)
     {
-        pthread_mutex_lock(&queue_lock);
-        pthread_cond_signal(&queue_condition);
-        pthread_mutex_unlock(&queue_lock);
+    	pthread_join(threads[i],NULL);	//join all threads
     }
 
     // print results
