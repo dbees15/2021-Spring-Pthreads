@@ -1,0 +1,84 @@
+gcc -g -O2 --std=c99 -Wall -o 66891-dbees15/2021-Spring-Pthreads/feedback/par_sumsq 66891-dbees15/2021-Spring-Pthreads/feedback/par_sumsq.c -lpthread
+==== Test 01 (baseline) ====
+>>>> Result should be 14 2 1 3 in all cases
+>>>> ... with 1 worker 'real' time should be ~7 seconds
+time -p ./66891-dbees15/2021-Spring-Pthreads/feedback/par_sumsq ./test-01.txt 1 2>&1
+14 2 1 3
+real 7.00
+user 5.00
+sys 0.00
+>>>> ... with 2 workers 'real' time should be ~5 seconds
+time -p ./66891-dbees15/2021-Spring-Pthreads/feedback/par_sumsq ./test-01.txt 2 2>&1
+14 2 1 3
+real 5.00
+user 3.00
+sys 0.00
+>>>> ... with 6 workers 'real' time should be ~5 seconds
+time -p ./66891-dbees15/2021-Spring-Pthreads/feedback/par_sumsq ./test-01.txt 6 2>&1
+14 2 1 3
+real 5.00
+user 3.00
+sys 0.00
+==== Test 02 (a little more stress) ====
+>>>> Result should be 6 6 1 1 in all cases
+>>>> ... with 1 worker 'real' time should be ~6 seconds
+time -p ./66891-dbees15/2021-Spring-Pthreads/feedback/par_sumsq ./test-02.txt 1 2>&1
+6 6 1 1
+real 6.00
+user 4.00
+sys 0.00
+>>>> ... with 2 workers 'real' time should be ~4 seconds
+time -p ./66891-dbees15/2021-Spring-Pthreads/feedback/par_sumsq ./test-02.txt 2 2>&1
+6 6 1 1
+real 4.00
+user 2.00
+sys 0.00
+>>>> ... with 6 workers 'real' time should be ~3 seconds
+time -p ./66891-dbees15/2021-Spring-Pthreads/feedback/par_sumsq ./test-02.txt 6 2>&1
+6 6 1 1
+real 3.00
+user 0.98
+sys 0.01
+==== Test 03 (lots of parallelism) ====
+>>>> Result should be 110 6 1 5 in all cases
+>>>> ... with 3 workers 'real' time should be ~12 seconds
+time -p ./66891-dbees15/2021-Spring-Pthreads/feedback/par_sumsq ./test-03.txt 3 2>&1
+110 6 1 5
+real 12.00
+user 12.00
+sys 0.00
+>>>> ... with 5 workers 'real' time should be ~9 seconds
+time -p ./66891-dbees15/2021-Spring-Pthreads/feedback/par_sumsq ./test-03.txt 5 2>&1
+110 6 1 5
+real 9.00
+user 8.99
+sys 0.00
+>>>> ... with 12 workers 'real' time should be ~5 seconds
+time -p ./66891-dbees15/2021-Spring-Pthreads/feedback/par_sumsq ./test-03.txt 12 2>&1
+110 6 1 5
+real 5.00
+user 5.00
+sys 0.00
+==== Test 04 (a little funky) ====
+>>>> Result should be 5 5 1 1 in all cases
+>>>> ... with 1 workers 'real' time should be ~10 seconds
+time -p ./66891-dbees15/2021-Spring-Pthreads/feedback/par_sumsq ./test-04.txt 1 2>&1
+5 5 1 1
+real 10.00
+user 0.00
+sys 0.00
+>>>> ... with 4 workers 'real' time should also be ~10 seconds
+time -p ./66891-dbees15/2021-Spring-Pthreads/feedback/par_sumsq ./test-04.txt 4 2>&1
+5 5 1 1
+real 10.00
+user 0.00
+sys 0.00
+>>>> ... huh, with 1000 workers 'real' time should still be ~10 seconds
+time -p ./66891-dbees15/2021-Spring-Pthreads/feedback/par_sumsq ./test-04.txt 1000 2>&1
+5 5 1 1
+real 10.00
+user 0.00
+sys 0.00
+>>>> ... (you will have more overhead, but should still be just above 10 sec)
+==== ... all tests done
+==== (all done) ====
